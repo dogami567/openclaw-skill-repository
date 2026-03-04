@@ -36,6 +36,40 @@ cp .env.example .env
 docker compose up -d
 ```
 
+## Linux / macOS 适配说明
+
+这套交付物本质上是 **Linux 容器**，因此：
+
+- **Linux**：直接使用 Docker Engine + Docker Compose 即可
+- **macOS（Intel / Apple Silicon）**：使用 Docker Desktop（容器在 Linux VM 中运行）
+
+已做多架构构建：
+
+- `ghcr.io/dogami567/clawdbot-exa:*`：`linux/amd64` + `linux/arm64`
+- `mlikiowa/napcat-docker:latest`：`linux/amd64` + `linux/arm64`
+
+### macOS 注意事项
+
+- 如果把目录放在外接硬盘（例如 `/Volumes/...`），需要在 Docker Desktop 的 **File Sharing** 里把该路径加进去，否则 bind mount 会失败。
+- 端口映射在 macOS 上同样可用：NapCat `6099/3001/3000`、Clawdbot `18789/18790`。
+
+### Linux 注意事项（目录权限）
+
+Clawdbot 镜像默认以非 root 用户（uid `1000`）运行，所以第一次启动前建议先创建并赋权：
+
+```bash
+cd stacks/napcat-clawdbot-exa
+mkdir -p ./data/clawdbot/config ./data/clawdbot/workspace
+sudo chown -R 1000:1000 ./data/clawdbot
+```
+
+NapCat 如需把容器内文件归属到当前用户，可在 `.env` 里设置：
+
+```bash
+NAPCAT_UID=$(id -u)
+NAPCAT_GID=$(id -g)
+```
+
 ### NapCat 登录入口
 
 - WebUI：`http://<宿主机IP>:${NAPCAT_WEBUI_PORT:-6099}/webui`
