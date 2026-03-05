@@ -1,0 +1,182 @@
+services:
+  openclaw-gateway:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:2026.3.2}
+    container_name: openclaw-gateway
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-change-me}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-./data/openclaw/config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-./data/openclaw/workspace}:/home/node/.openclaw/workspace
+      # Avoid Windows bind-mount permission quirks: keep extensions on a Docker-managed volume.
+      - openclaw-extensions:/home/node/.openclaw/extensions
+      # Optional extra host workdir mount for the agent.
+      - ${OPENCLAW_HOST_WORKDIR:-./data/workdir}:/home/node/.openclaw/workspace/host:rw
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+      - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+    init: true
+    restart: unless-stopped
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "gateway",
+        "--bind",
+        "${OPENCLAW_GATEWAY_BIND:-lan}",
+        "--port",
+        "18789"
+      ]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  openclaw-cli:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:2026.3.2}
+    container_name: openclaw-cli
+    network_mode: "service:openclaw-gateway"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-change-me}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
+      BROWSER: echo
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR:-./data/openclaw/config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-./data/openclaw/workspace}:/home/node/.openclaw/workspace
+      - openclaw-extensions:/home/node/.openclaw/extensions
+      - ${OPENCLAW_HOST_WORKDIR:-./data/workdir}:/home/node/.openclaw/workspace/host:rw
+    stdin_open: true
+    tty: true
+    init: true
+    entrypoint: ["node", "dist/index.js"]
+    depends_on:
+      - openclaw-gateway
+
+  napcat:
+    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:latest}
+    container_name: napcat
+    environment:
+      NAPCAT_UID: ${NAPCAT_UID:-0}
+      NAPCAT_GID: ${NAPCAT_GID:-0}
+      # Quick login (avoids re-scanning QR on container recreate).
+      ACCOUNT: ${NAPCAT_ACCOUNT:-}
+      # Don't use the upstream default ("napcat"), otherwise NapCat may auto-rotate it for safety.
+      WEBUI_TOKEN: ${NAPCAT_WEBUI_TOKEN:-openclaw-napcat}
+      WEBUI_PREFIX: ${NAPCAT_WEBUI_PREFIX:-}
+      # NOTE: Don't set MODE here. MODE makes the container overwrite onebot11.json from /app/templates on each start.
+    volumes:
+      - ${NAPCAT_DATA_DIR:-./data/napcat}/qq:/app/.config/QQ
+      - ${NAPCAT_DATA_DIR:-./data/napcat}/config:/app/napcat/config
+      - ${NAPCAT_DATA_DIR:-./data/napcat}/plugins:/app/napcat/plugins
+    ports:
+      # OneBot (HTTP / WS)
+      - "${NAPCAT_HTTP_PORT:-6300}:3000"
+      - "${NAPCAT_WS_PORT:-6301}:3001"
+      # NapCat WebUI
+      - "${NAPCAT_WEBUI_PORT:-6099}:6099"
+    shm_size: "1gb"
+    init: true
+    restart: unless-stopped
+
+  clawdbot-gateway:
+    image: ${CLAWDBOT_IMAGE:-ghcr.io/dogami567/clawdbot-exa:latest}
+    container_name: clawdbot-gateway
+    profiles: ["clawdbot"]
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      CLAWDBOT_GATEWAY_TOKEN: ${CLAWDBOT_GATEWAY_TOKEN:-change-me}
+
+      # Model providers
+      OPENAI_API_KEY: ${CLAWDBOT_OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${CLAWDBOT_OPENAI_BASE_URL:-}
+      OPENROUTER_API_KEY: ${CLAWDBOT_OPENROUTER_API_KEY:-}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+
+      # Exa provider (web_search)
+      EXA_API_KEYS: ${EXA_API_KEYS:-}
+      EXA_API_KEY: ${EXA_API_KEY:-}
+    volumes:
+      - ${CLAWDBOT_CONFIG_DIR:-./data/clawdbot/config}:/home/node/.clawdbot
+      - ${CLAWDBOT_WORKSPACE_DIR:-./data/clawdbot/workspace}:/home/node/clawd
+    ports:
+      - "${CLAWDBOT_GATEWAY_PORT:-28789}:18789"
+      - "${CLAWDBOT_BRIDGE_PORT:-28790}:18790"
+    init: true
+    restart: unless-stopped
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "gateway",
+        "--bind",
+        "${CLAWDBOT_GATEWAY_BIND:-lan}",
+        "--port",
+        "18789"
+      ]
+
+  clawdbot-cli:
+    image: ${CLAWDBOT_IMAGE:-ghcr.io/dogami567/clawdbot-exa:latest}
+    container_name: clawdbot-cli
+    profiles: ["clawdbot"]
+    network_mode: "service:clawdbot-gateway"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      CLAWDBOT_GATEWAY_TOKEN: ${CLAWDBOT_GATEWAY_TOKEN:-change-me}
+      BROWSER: echo
+
+      # Model providers
+      OPENAI_API_KEY: ${CLAWDBOT_OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${CLAWDBOT_OPENAI_BASE_URL:-}
+      OPENROUTER_API_KEY: ${CLAWDBOT_OPENROUTER_API_KEY:-}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
+
+      # Exa provider (web_search)
+      EXA_API_KEYS: ${EXA_API_KEYS:-}
+      EXA_API_KEY: ${EXA_API_KEY:-}
+    volumes:
+      - ${CLAWDBOT_CONFIG_DIR:-./data/clawdbot/config}:/home/node/.clawdbot
+      - ${CLAWDBOT_WORKSPACE_DIR:-./data/clawdbot/workspace}:/home/node/clawd
+    stdin_open: true
+    tty: true
+    init: true
+    entrypoint: ["node", "dist/index.js"]
+    depends_on:
+      - clawdbot-gateway
+
+volumes:
+  openclaw-extensions:
+

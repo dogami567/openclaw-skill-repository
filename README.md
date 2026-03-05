@@ -9,6 +9,7 @@
 
 - `clawdbot-exa`：在上游 `clawdbot/clawdbot` 固定版本上应用 patch，新增 `provider="exa"`（向后兼容 `brave/perplexity`）
 - `napcat-clawdbot-exa`：NapCat + Clawdbot Gateway 的 compose 模板
+- `openclaw-napcat-onebot`：OpenClaw + NapCat（OneBot v11）的一键部署模板（内置 `onebot` 插件），可选启动 Clawdbot
 
 ## 快速开始（NapCat + Clawdbot Gateway）
 
@@ -35,6 +36,27 @@ cp .env.example .env
 ```bash
 docker compose up -d
 ```
+
+## 快速开始（OpenClaw + NapCat + OneBot）
+
+1) 进入目录：
+
+```bash
+cd stacks/openclaw-napcat-onebot
+```
+
+2) 创建环境文件：
+
+```bash
+cp .env.example .env
+```
+
+3) 一键启动（推荐）：
+
+- Windows：`powershell -ExecutionPolicy Bypass -File .\\scripts\\up.ps1`
+- Linux/macOS：`chmod +x scripts/*.sh && ./scripts/up.sh`
+
+> 说明：脚本会自动写入 NapCat `onebot11.json`、安装 OpenClaw `onebot` 插件、并写入 OpenClaw 的 `channels.onebot.*` 配置。
 
 ## Linux / macOS 适配说明
 

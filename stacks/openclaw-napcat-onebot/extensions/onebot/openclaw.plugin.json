@@ -1,0 +1,12 @@
+{
+  "id": "onebot",
+  "channels": ["onebot"],
+  "name": "NapCat OneBot",
+  "description": "NapCat (OneBot v11) channel plugin",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
+

@@ -82,6 +82,7 @@ jobs:
           for d in stacks/*; do
             name="$(basename "$d")"
             (cd "$d" && zip -r "../../dist/${name}-${{ github.ref_name }}.zip" .)
+            (cd "$d" && tar -czf "../../dist/${name}-${{ github.ref_name }}.tar.gz" .)
           done
           sha256sum dist/* > dist/SHA256SUMS.txt
 
@@ -91,5 +92,6 @@ jobs:
           generate_release_notes: true
           files: |
             dist/*.zip
+            dist/*.tar.gz
             dist/SHA256SUMS.txt
             dist/clawdbot.ref
